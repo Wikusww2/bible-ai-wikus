@@ -1,6 +1,10 @@
 # Bible AI
 
+[![Checks](https://github.com/Wikusww2/bible-ai-wikus/actions/workflows/ci.yml/badge.svg)](https://github.com/Wikusww2/bible-ai-wikus/actions/workflows/ci.yml)
+
 A personal Bible study workspace with direct Scripture lookup, an OpenAI Responses API agent, source links, original-language text and Strong's lexicon lookup, and a file and artifact Library. The interface supports desktop and mobile layouts, five palettes, and light and dark appearance.
+
+Maintained by [Wikus van Wyk (@Wikusww2)](https://github.com/Wikusww2). The project is early in its public development. Its reusable maintenance work includes deterministic Scripture retrieval, recoverable agent runs, conflict-preserving storage and Unicode study exports. See the [roadmap](docs/ROADMAP.md), [contribution guide](CONTRIBUTING.md) and [security policy](SECURITY.md).
 
 ## Run locally
 
@@ -50,3 +54,7 @@ Translation availability depends on the provider. Unsupported translations can f
 Cost estimates use the dated rate table in `js/harness.js`, account for reported web-search calls, and are estimates rather than invoices. Generated React artifacts must be complete browser-ready HTML; this app does not compile arbitrary JSX uploads.
 
 See [audit fixes and verification](docs/AUDIT-FIXES.md). No real paid OpenAI request or production authentication gateway has been tested in this revision.
+
+## License
+
+Original project code is available under the [MIT License](LICENSE). Third-party fonts, dependencies, translations and external services retain their own terms; see [third-party notices](THIRD_PARTY_NOTICES.md).
