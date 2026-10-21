@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#315b49" />
+  <meta name="description" content="A private Protestant evangelical Bible AI workspace for Scripture, open-web research, original-language study and visual artifacts." />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Bible AI — Study Agent" />
+  <meta property="og:description" content="Scripture lookup, grounded research, and original-language Bible study in one private workspace." />
+  <meta property="og:url" content="__SITE_ORIGIN__/" />
+  <meta property="og:image" content="__SITE_ORIGIN__/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Bible AI — Study Agent" />
+  <meta name="twitter:description" content="Scripture lookup, grounded research, and original-language Bible study in one private workspace." />
+  <meta name="twitter:image" content="__SITE_ORIGIN__/og.png" />
+  <title>Bible AI — Study Agent</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23315b49'/%3E%3Cpath d='M16 6v18M10 11h12M9 27c4-3 10-3 14 0' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/app.css?v=22" />
+  <!--
+  ============================================================
+  BIBLE AI — working app (v2, supersedes bible-ai-frontend.html)
+  ARCHITECTURE
+    js/bible.js   — deterministic reference parser + scripture provider (bolls.life, CORS, free).
+                    Verified passage cards come from the provider; AI commentary is labelled separately.
+    js/harness.js — the agent harness: settings store, typed tool registry, OpenAI Responses API
+                    resumable background streaming tool-loop, approvals, citations, artifacts,
+                    retries and cancellation. Hosted web_search powers open-web research.
+    js/sync.js    — revision-checked authenticated cloud sync with local offline caching.
+    js/app.js     — UI layer: chat, original-language study, topics, Library, history, settings,
+                    uploads/camera, previews, usage/cost accounting, palettes and quick actions.
+  KEY BEHAVIOURS
+    * Direct references ("Matthew 1:1 CSB") take a deterministic fast-path: parser + provider,
+      zero model tokens. Everything else goes through the agent loop.
+    * Research is part of the single chat: open-web retrieval, claim-level citations and a visible
+      source ledger, with source standpoints checked against the app's Protestant evangelical ethos.
+    * The API key is cached locally and encrypted at rest for owner-authenticated cross-device sync.
+    * Original Languages view (js/bible.js OriginalProvider): real manuscripts — WLC Hebrew (OT)
+      and Textus Receptus Greek (NT) — with Strong's word tagging parsed from KJV <S> tags and
+      BDB/Thayer lexicon entries (bolls dictionary API). Works fully without an API key.
+    * "Understand" engine: book/chapter/verse/word-level analysis cards (STUDY_LEVELS in app.js)
+      that run the agent harness in deep-study mode (buildInstructions 'study') with the
+      get_original_text and get_strongs_lexicon tools.
+  ============================================================
+  -->
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-logo" viewBox="0 0 32 32"><path d="M16 4v18M10 9h12M8 26c5-3 11-3 16 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m16.5 16.5 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+      <symbol id="i-chev-left" viewBox="0 0 24 24"><path d="m14 7-5 5 5 5M19 7l-5 5 5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-chev-down" viewBox="0 0 24 24"><path d="m7 9 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="m9 7 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-cap" viewBox="0 0 24 24"><path d="m3 9 9-5 9 5-9 5-9-5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M7 12v4c3 2 7 2 10 0v-4M21 9v6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="3" y="14" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="14" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
+      <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4V4.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+      <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 2.6-6.35L3 8.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M3 3v5h5M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1-2.8 2.8-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21h-4v-.2a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1-2.8-2.8.1-.1A1.6 1.6 0 0 0 4.8 15a1.6 1.6 0 0 0-1.5-1H3v-4h.3a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1 2.8-2.8.1.1a1.6 1.6 0 0 0 1.8.3 1.6 1.6 0 0 0 1-1.5V3h4v.2a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1 2.8 2.8-.1.1a1.6 1.6 0 0 0-.3 1.8 1.6 1.6 0 0 0 1.5 1h.2v4h-.2a1.6 1.6 0 0 0-1.5 1Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.6 8.6 0 0 1-3.7-.9L4 20l1.2-4A7.5 7.5 0 1 1 20 11.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 15.5A8 8 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+      <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="7" width="11" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M16 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
+      <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+      <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="m12 3 1.4 4.1L17.5 8.5l-4.1 1.4L12 14l-1.4-4.1-4.1-1.4 4.1-1.4L12 3ZM18.5 14l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2ZM5 14l.7 1.8 1.8.7-1.8.7L5 18l-.7-1.8-1.8-.7 1.8-.7L5 14Z" fill="currentColor"/></symbol>
+      <symbol id="i-book" viewBox="0 0 24 24"><path d="M3 5.5A3.5 3.5 0 0 1 6.5 2H11v18H6.5A3.5 3.5 0 0 0 3 23V5.5ZM21 5.5A3.5 3.5 0 0 0 17.5 2H13v18h4.5A3.5 3.5 0 0 1 21 23V5.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24"><path d="m13 2-8 12h7l-1 8 8-12h-7l1-8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+      <symbol id="i-note" viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M15 3v4h4M8 11h6M8 15h6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24"><path d="m21 3-7.5 18-3.1-7.4L3 10.5 21 3Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m10.4 13.6 4.1-4.1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+      <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+      <symbol id="i-paperclip" viewBox="0 0 24 24"><path d="m8.5 12.5 6.7-6.7a3.2 3.2 0 0 1 4.5 4.5l-8.8 8.8a5 5 0 0 1-7.1-7.1l8.2-8.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+      <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 7.5h3l1.5-2h7l1.5 2h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="14" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 2h8l5 5v15H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M14 2v6h6" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
+      <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="9" cy="10" r="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m5 18 5-5 3 3 2-2 4 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+      <symbol id="i-crossref" viewBox="0 0 24 24"><path d="M12 3v18M6 9h12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+      <symbol id="i-commentary" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 8h8M8 12h8M8 16h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.6 3 8.4 7 10 4-1.6 7-5.4 7-10V6l-7-3Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="14" r="4.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m11.5 10.5 8-8M17 5l2.5 2.5M14 8l2 2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+      <symbol id="i-lang" viewBox="0 0 24 24"><text x="2.5" y="13" font-size="12.5" font-weight="700" font-family="Georgia, serif" fill="currentColor" stroke="none">א</text><text x="12.5" y="21.5" font-size="12" font-weight="700" font-family="Georgia, serif" fill="currentColor" stroke="none">Ω</text></symbol>
+    </defs>
+  </svg>
+
+  <div class="app-shell" id="appShell">
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
+      <div class="brand-row">
+        <span class="brand-mark"><svg><use href="#i-logo"/></svg></span>
+        <span class="brand-name">Bible AI</span>
+        <button class="collapse-btn" id="collapseSidebar" aria-label="Collapse sidebar"><svg><use href="#i-chev-left"/></svg></button>
+      </div>
+      <button class="new-chat-btn" id="newChatBtn"><svg><use href="#i-plus"/></svg>New conversation</button>
+      <nav class="nav-list" aria-label="Views">
+        <button class="nav-item active" data-nav="chat"><svg><use href="#i-chat"/></svg><span>Study Chat</span></button>
+        <button class="nav-item" data-nav="original"><svg><use href="#i-lang"/></svg><span>Original Languages</span></button>
+        <button class="nav-item" data-nav="topics"><svg><use href="#i-grid"/></svg><span>Topics</span></button>
+        <button class="nav-item" data-nav="library"><svg><use href="#i-file"/></svg><span>Library</span></button>
+        <button class="nav-item" data-nav="history"><svg><use href="#i-history"/></svg><span>History</span></button>
+        <button class="nav-item" data-nav="settings"><svg><use href="#i-settings"/></svg><span>Settings</span></button>
+      </nav>
+      <div class="recent">
+        <p class="recent-title">Recent Conversations</p>
+        <div class="recent-list" id="recentList"></div>
+      </div>
+      <p class="sidebar-foot">Private workspace · encrypted device sync</p>
+    </aside>
+    <div id="scrim"></div>
+
+    <!-- ================= WORKSPACE ================= -->
+    <div class="workspace">
+      <header class="topbar">
+        <button class="icon-btn" id="expandSidebar" aria-label="Expand sidebar" hidden><svg><use href="#i-menu"/></svg></button>
+        <button class="icon-btn mobile-menu" id="mobileMenu" aria-label="Open navigation"><svg><use href="#i-menu"/></svg></button>
+        <div class="global-search">
+          <div class="search-field">
+            <svg><use href="#i-search"/></svg>
+            <input id="globalSearch" type="search" autocomplete="off" placeholder="Search" aria-label="Global search" aria-expanded="false" aria-controls="searchPopover" />
+            <span class="kbd">⌘K</span>
+          </div>
+          <div class="search-popover" id="searchPopover" role="group" aria-label="Search results"></div>
+        </div>
+        <div class="topbar-spacer"></div>
+        <div class="version-control">
+          <button class="version-button" id="versionButton" aria-haspopup="true" aria-expanded="false"><span id="currentVersion">CSB</span><svg><use href="#i-chev-down"/></svg></button>
+          <div class="version-menu" id="versionMenu" role="group" aria-label="Bible translation"></div>
+        </div>
+        <button class="icon-btn theme-button" id="themeButton" aria-label="Toggle theme"><svg id="themeIcon"><use href="#i-sun"/></svg></button>
+        <button class="icon-btn panel-toggle" id="panelToggle" aria-label="Toggle side panel" aria-expanded="false"><svg><use href="#i-bolt"/></svg></button>
+        <div class="avatar">W</div>
+      </header>
+
+      <div class="body-grid">
+        <div class="view-host">
+          <!-- ===== CHAT (verse lookup / research / open chat) ===== -->
+          <section class="view active" data-view="chat" aria-label="Conversation">
+            <div class="mode-banner" id="modeBanner"><span></span><button class="cost-badge" id="chatCostBadge" type="button" hidden></button></div>
+            <div class="conversation" id="conversation">
+              <div class="feed" id="feed"></div>
+              <div class="composer-zone">
+                <form class="composer" id="composer">
+                  <div class="composer-main">
+                    <button type="button" class="composer-tools-toggle" id="attachButton" aria-label="Attach a file or photo" aria-expanded="false"><svg><use href="#i-paperclip"/></svg></button>
+                    <label class="sr-only" for="composerInput">Message Bible AI</label>
+                    <textarea id="composerInput" rows="1" placeholder="Ask a verse or question…"></textarea>
+                    <button type="button" class="stop-button" id="stopButton" aria-label="Stop the agent"><svg><use href="#i-stop"/></svg></button>
+                    <button type="submit" class="send-button" aria-label="Send"><svg><use href="#i-send"/></svg></button>
+                  </div>
+                  <div class="attachment-tray" id="attachmentTray" hidden></div>
+                  <button type="button" class="hints-toggle" id="toggleHints" aria-expanded="false" aria-controls="composerHints">Study tools</button><div class="chips" id="composerHints">
+                    <button type="button" class="chip" data-hint="Research this across the open web, check the claims, and cite the sources"><svg><use href="#i-cap"/></svg>Research</button>
+                    <button type="button" class="chip" data-hint="Include the strongest cross-references and retrieve each quoted passage"><svg><use href="#i-crossref"/></svg>Cross-references</button>
+                    <button type="button" class="chip" data-hint="Explain the key Hebrew, Aramaic or Greek words using the lexicon"><svg><use href="#i-lang"/></svg>Original words</button>
+                    <button type="button" class="chip" data-hint="Create a polished visual explainer artifact I can preview"><svg><use href="#i-image"/></svg>Create visual</button>
+                  </div>
+                </form>
+                <input id="fileInput" type="file" multiple hidden />
+                <input id="imageInput" type="file" accept="image/*" multiple hidden />
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== ORIGINAL LANGUAGES & UNDERSTAND ===== -->
+          <section class="view" data-view="original" aria-label="Original languages">
+            <div class="page">
+              <h1 class="page-title"><svg><use href="#i-lang"/></svg>Original Languages</h1>
+              <p class="page-sub">Read any passage in its original Hebrew, Aramaic or Greek, use KJV-linked phrases for the lexicon, then run book / chapter / verse / word-level studies.</p>
+              <form class="orig-form" id="origForm">
+                <div class="search-field">
+                  <svg><use href="#i-search"/></svg>
+                  <input id="origInput" type="text" autocomplete="off" placeholder="e.g. Genesis 1:1 or John 3:16-17" aria-label="Passage reference" />
+                </div>
+                <button class="btn primary" type="submit">Open</button>
+              </form>
+              <div class="chips orig-quick">
+                <button type="button" class="chip" data-ref="Genesis 1:1">Genesis 1:1</button>
+                <button type="button" class="chip" data-ref="Psalm 23:1">Psalm 23:1</button>
+                <button type="button" class="chip" data-ref="Isaiah 53:5">Isaiah 53:5</button>
+                <button type="button" class="chip" data-ref="Daniel 7:13">Daniel 7:13 · Aramaic</button>
+                <button type="button" class="chip" data-ref="John 3:16">John 3:16</button>
+                <button type="button" class="chip" data-ref="Romans 8:28">Romans 8:28</button>
+                <button type="button" class="chip" data-ref="Ephesians 2:8-9">Ephesians 2:8–9</button>
+              </div>
+              <div id="origResult">
+                <div class="orig-intro">
+                  <div class="orig-intro-glyphs" aria-hidden="true"><span dir="rtl">בְּרֵאשִׁ֖ית</span><span>λόγος</span></div>
+                  <h3>The text behind the text</h3>
+                  <p>Old Testament passages open in the <strong>Westminster Leningrad Codex</strong> (Hebrew, with vowel points); New Testament passages in the <strong>Textus Receptus</strong> (Koine Greek). The Bible's <strong>Aramaic</strong> sections — Daniel 2:4–7:28, Ezra 4:8–6:18 &amp; 7:12–26, Jeremiah 10:11 — are preserved inside the same Masoretic manuscript and are detected and labelled automatically, verse by verse. English KJV phrases provide Strong's lookup links where verse numbering agrees with the manuscript — choose a link to open the BDB/Thayer lexicon: lemma, transliteration, pronunciation, and full semantic range. No API key needed for any of this.</p>
+                </div>
+              </div>
+              <div id="understandPanel" class="understand-panel" hidden></div>
+            </div>
+          </section>
+
+          <!-- ===== TOPICS ===== -->
+          <section class="view" data-view="topics" aria-label="Saved topics">
+            <div class="page">
+              <h1 class="page-title"><svg><use href="#i-grid"/></svg>Topical Studies</h1>
+              <p class="page-sub">Finished topical searches are saved here automatically so you can return to them.</p>
+              <div class="topics-grid" id="topicsGrid"></div>
+            </div>
+          </section>
+
+          <!-- ===== LIBRARY ===== -->
+          <section class="view" data-view="library" aria-label="File library">
+            <div class="page">
+              <div class="library-head"><div><h1 class="page-title"><svg><use href="#i-file"/></svg>Library</h1><p class="page-sub">Uploads and files created by Bible AI, saved across your devices.</p></div><button class="btn primary" id="libraryUpload"><svg><use href="#i-plus"/></svg>Add files</button></div>
+              <div class="library-filters" id="libraryFilters"><button class="seg active" data-filter="all">All</button><button class="seg" data-filter="upload">Uploads</button><button class="seg" data-filter="created">Created</button></div>
+              <div class="library-grid" id="libraryGrid"></div>
+            </div>
+          </section>
+
+          <!-- ===== HISTORY ===== -->
+          <section class="view" data-view="history" aria-label="History">
+            <div class="page">
+              <h1 class="page-title"><svg><use href="#i-history"/></svg>History</h1>
+              <p class="page-sub">Every conversation with its mode, translation and sources. Reopen to continue where you left off.</p>
+              <div class="history-list" id="historyList"></div>
+            </div>
+          </section>
+
+          <!-- ===== SETTINGS ===== -->
+          <section class="view" data-view="settings" aria-label="Settings">
+            <div class="page">
+              <h1 class="page-title"><svg><use href="#i-settings"/></svg>Settings</h1>
+              <p class="page-sub">Model, agent harness, scripture and app preferences. Your workspace syncs privately across your signed-in devices.</p>
+
+              <div class="settings-section">
+                <h2><svg><use href="#i-key"/></svg>AI Model</h2>
+                <p class="section-sub">Connects directly to the OpenAI Responses API from your browser.</p>
+                <label class="field-label" for="apiKeyInput">API key <small>Stored in plaintext in this browser, encrypted at rest by the authenticated sync server. HTTPS protects transport to OpenAI and this app’s sync server. The server can read the key; this is not end-to-end encryption.</small></label>
+                <form class="key-row" id="apiKeyForm">
+                  <input id="apiKeyInput" type="password" placeholder="sk-…" autocomplete="off" spellcheck="false" />
+                  <button class="btn" id="toggleKeyBtn" type="button">Show</button>
+                  <button class="btn primary" id="saveKeyBtn" type="submit">Save</button>
+                </form>
+                <p class="key-status" id="apiKeyStatus"></p>
+                <span class="field-label">Model</span>
+                <div class="model-grid" id="modelGrid"></div>
+                <label class="field-label" for="customModel">Custom model ID <small>Overrides the cards above — leave empty to use the selected model.</small></label>
+                <input class="text-input" id="customModel" placeholder="e.g. gpt-5.6-sol-preview" />
+                <span class="field-label">Reasoning effort <small>How long the model thinks before answering.</small></span>
+                <div class="seg-group" id="reasoningSeg"></div>
+                <span class="field-label">Answer verbosity</span>
+                <div class="seg-group" id="verbositySeg"></div>
+              </div>
+
+              <div class="settings-section" id="usageSettings">
+                <h2><svg><use href="#i-bolt"/></svg>Usage &amp; estimated cost</h2>
+                <p class="section-sub">Actual API token counts, priced at standard GPT-5.6 rates. Reasoning is shown separately but is already part of billed output.</p>
+                <div class="usage-summary" id="usageSummary"></div>
+                <div class="fx-row"><span id="fxRateText"></span><button class="btn small" id="refreshRateBtn" type="button">Refresh rate</button></div>
+                <p class="estimate-note">ZAR totals are estimates based on the saved SARB reference exchange rate. OpenAI invoices in USD and may differ slightly.</p>
+              </div>
+
+              <div class="settings-section">
+                <h2><svg><use href="#i-bolt"/></svg>Agent Harness</h2>
+                <p class="section-sub">The harness owns the tool loop: what the agent may do, how many rounds it may take, and what needs your approval.</p>
+                <label class="field-label" for="maxRounds">Max tool rounds per turn</label>
+                <input class="num-input" id="maxRounds" type="number" min="1" max="20" />
+                <span class="field-label">Tools</span>
+                <div id="toolToggles"></div>
+              </div>
+
+              <div class="settings-section">
+                <h2><svg><use href="#i-book"/></svg>Scripture</h2>
+                <label class="field-label" for="defaultTranslation">Default translation</label>
+                <select class="text-input" id="defaultTranslation"></select>
+                <label class="toggle-row" style="margin-top:10px"><span><strong>Auto translation mode</strong><small>If a prompt names a translation ("…in ESV"), use it for that answer.</small></span>
+                  <input type="checkbox" id="autoTranslation" /><span class="switch"></span></label>
+              </div>
+
+              <div class="settings-section">
+                <h2><svg><use href="#i-settings"/></svg>App</h2>
+                <span class="field-label">Theme</span>
+                <div class="seg-group" id="themeSeg"></div>
+                <span class="field-label">Colour style</span>
+                <div class="palette-grid" id="paletteGrid"></div>
+                <span class="field-label">Cloud workspace</span>
+                <div class="sync-status" id="syncStatus"></div>
+                <span class="field-label">Your data</span>
+                <div class="danger-zone">
+                  <button class="btn" id="exportBtn">Export full backup (ZIP)</button>
+                  <button class="btn" id="exportJsonBtn">Export workspace JSON (no files)</button>
+                  <button class="btn" id="importBtn">Restore backup</button><input type="file" id="backupInput" accept=".zip" hidden>
+                  <button class="btn danger" id="wipeBtn">Delete all data</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- ================= RIGHT PANEL ================= -->
+        <aside class="right-panel" id="rightPanel" aria-label="Context panel">
+          <div class="right-panel-head"><h2 class="right-section-title"><svg><use href="#i-bolt"/></svg>Quick Actions</h2><button class="panel-close" id="rightPanelClose" aria-label="Close quick actions">×</button></div>
+          <div class="quick-grid compact">
+            <button class="quick-button" id="qaCopy"><svg><use href="#i-copy"/></svg><span>Copy verse</span></button>
+            <button class="quick-button" id="qaCompare"><svg><use href="#i-grid"/></svg><span>Compare versions</span></button>
+            <button class="quick-button" id="qaContext"><svg><use href="#i-external"/></svg><span>Open context</span></button>
+          </div>
+          <section class="side-card" aria-labelledby="sourcesTitle">
+            <div class="side-card-head"><svg><use href="#i-book"/></svg><div class="side-card-title" id="sourcesTitle">Research Sources</div><span class="badge" id="sourceCount">0 sources</span></div>
+            <div class="source-list" id="sourceList"></div>
+            <button class="side-link" id="viewAllSources"><span>View all sources</span><svg><use href="#i-chev-right"/></svg></button>
+          </section>
+        </aside>
+      </div>
+
+      <!-- mobile bottom tab bar (iPhone) -->
+      <nav class="tabbar" aria-label="Mobile navigation">
+        <button class="tab-item active" data-nav="chat"><svg><use href="#i-chat"/></svg>Chat</button>
+        <button class="tab-item" data-nav="original"><svg><use href="#i-lang"/></svg>Original</button>
+        <button class="tab-item" data-nav="library"><svg><use href="#i-file"/></svg>Library</button>
+        <button class="tab-item" data-nav="history"><svg><use href="#i-history"/></svg>History</button>
+        <button class="tab-item" data-nav="settings"><svg><use href="#i-settings"/></svg>Settings</button>
+      </nav>
+    </div>
+  </div>
+
+  <div class="sheet-scrim" id="sheetScrim" hidden></div>
+  <section class="bottom-sheet attach-sheet" id="attachSheet" aria-label="Add to your message" aria-hidden="true">
+    <div class="sheet-handle"></div><div class="sheet-head"><div><strong>Add to your message</strong><small>Uploads are saved to your private Library</small></div><button class="sheet-close" data-close-sheet aria-label="Close">×</button></div>
+    <div class="attach-options">
+      <button data-attach="camera"><span><svg><use href="#i-camera"/></svg></span><strong>Camera</strong><small>Take a photo</small></button>
+      <button data-attach="photos"><span><svg><use href="#i-image"/></svg></span><strong>Photos</strong><small>Choose from library</small></button>
+      <button data-attach="files"><span><svg><use href="#i-file"/></svg></span><strong>Files</strong><small>Any file up to 25 MB</small></button>
+    </div>
+  </section>
+
+  <section class="bottom-sheet camera-sheet" id="cameraSheet" aria-label="Camera" aria-hidden="true">
+    <div class="camera-top"><button class="camera-control" data-close-camera aria-label="Close camera">×</button><strong>Camera</strong><button class="camera-control" id="flipCamera" aria-label="Flip camera">↻</button></div>
+    <div class="camera-frame"><video id="cameraVideo" playsinline autoplay muted></video><div class="camera-guide"></div></div>
+    <div class="camera-actions"><button class="shutter" id="capturePhoto" aria-label="Take photo"><span></span></button><small>Tap to attach</small></div>
+  </section>
+
+  <section class="bottom-sheet viewer-sheet" id="browserSheet" aria-label="Web page viewer" aria-hidden="true">
+    <div class="viewer-bar"><button class="sheet-close" data-close-browser aria-label="Close viewer">×</button><div class="viewer-location"><strong id="browserTitle">Source</strong><small id="browserHost"></small></div><button class="viewer-external" id="openExternal">Open externally</button></div>
+    <div class="viewer-progress" id="browserProgress"></div><p id="browserHint" role="status"></p><iframe id="browserFrame" title="Web page" sandbox="allow-scripts allow-forms allow-popups" referrerpolicy="no-referrer"></iframe>
+  </section>
+
+  <section class="bottom-sheet viewer-sheet artifact-sheet" id="artifactSheet" aria-label="Artifact preview" aria-hidden="true">
+    <div class="viewer-bar"><button class="sheet-close" data-close-artifact aria-label="Close preview">×</button><div class="viewer-location"><strong id="artifactTitle">Preview</strong><small id="artifactMeta"></small></div><a class="viewer-external" id="artifactDownload" download>Download</a></div>
+    <iframe id="artifactFrame" title="Artifact preview" sandbox="allow-scripts allow-forms allow-modals allow-downloads"></iframe>
+  </section>
+
+  <div class="selection-actions" id="selectionActions" hidden><span id="selectionQuote"></span><button data-selection="ask">Ask about this</button><button data-selection="more">Tell me more</button><button data-selection="close" aria-label="Dismiss">×</button></div>
+
+  <!-- ================= DIALOGS ================= -->
+  <dialog id="compareDialog" aria-labelledby="compareTitle">
+    <div class="modal-head"><h2 id="compareTitle">Compare versions</h2><button class="modal-close" data-close-dialog aria-label="Close">×</button></div>
+    <div class="modal-body" id="compareBody"></div>
+  </dialog>
+  <dialog id="sourcesDialog" aria-labelledby="allSourcesTitle">
+    <div class="modal-head"><h2 id="allSourcesTitle">Sources used in this conversation</h2><button class="modal-close" data-close-dialog aria-label="Close">×</button></div>
+    <div class="modal-body" id="sourcesBody"></div>
+  </dialog>
+  <dialog id="welcomeDialog" aria-labelledby="welcomeTitle">
+    <div class="welcome-body">
+      <div class="empty-logo"><svg><use href="#i-logo"/></svg></div>
+      <h2 id="welcomeTitle">Welcome to Bible AI</h2>
+      <p>Direct verse lookups work immediately — try <strong>“Matthew 1:1 CSB”</strong>. To bring the full agent online, add your OpenAI API key in Settings. On the hosted app it is encrypted and synced only to your signed-in devices.</p>
+      <div class="welcome-actions">
+        <button class="btn ghost" id="welcomeSkip">Explore first</button>
+        <button class="btn primary" id="welcomeSettings">Add API key</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/vendor.js?v=22"></script>
+  <script src="js/bible.js?v=22"></script>
+  <script src="js/harness.js?v=22"></script>
+  <script src="js/sync.js?v=22"></script>
+  <script src="js/app.js?v=22"></script>
+</body>
+</html>
